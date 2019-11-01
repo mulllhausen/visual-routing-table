@@ -1,5 +1,5 @@
 # visual-routing-table
-visualize the output of:
+Visualize the output of:
 
     $ route
 
@@ -7,6 +7,10 @@ on linux, or:
 
     > route print
 
-on windows.
+on Windows, or
 
-currently this is just an idea. i am planning to work on it if i get time after some other projects that take precedence
+    $ netstat -rn
+
+on macOS or linux.
+
+This is a work in progress.
