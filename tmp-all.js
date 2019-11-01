@@ -1,11 +1,16 @@
 var svgProperties = {
     overallHeight: 400, // gets updated to match the svg
   overallWidth: 400, // gets updated to match the svg
+  ipLeft: 100, // the left position of the ip ranges
   verticalGapBetweenInterfaces: 10,
   verticalGapBeforeAndAfterInterfaces: 30, // the gap before interfaces, repeated at the bottom too
-  interfaceWidth: 50, // gets updated to match the svg // todo - change to interfaceLeft
+  interfaceLeft: 250, // the left position of the interfaces
+  interfaceRight: 300, // the left position of the interfaces
   borderTop: 1,
-  borderLeft: 1
+  borderLeft: 1,
+  colors: [
+    'blue','green', 'red', 'yellow'
+  ]
 };
 
 function getMissingData(dataIn) {
@@ -233,6 +238,8 @@ function render(routingTableData) {
   var ipRangesData = getIPRangeCoordinates(routingTableData);
   // render the ip ranges going to the interfaces
   renderIPRanges(ipRangesData, interfaceData);
+  
+  renderDestinationIPFlow(document.getElementById('destinationIP').value);
 }
 
 function updateSVGProperties() {
@@ -262,8 +269,7 @@ function getInterfaceCoordinates(routingTableData) {
         top: top,
       midway: top + (heightPerInterface / 2),
       height: heightPerInterface,
-      bottom: top + heightPerInterface,
-      left: svgProperties.overallWidth - svgProperties.interfaceWidth
+      bottom: top + heightPerInterface
     });
   }
   return interfaceData;
@@ -276,7 +282,7 @@ function renderInterfaces(interfaceData) {
     var nicData = interfaceData[i];
     var nicEl = svgDefs.querySelectorAll('.nic')[0].cloneNode(true);
     nicEl.getElementsByTagName('rect')[0].setAttribute('height', nicData.height);
-    nicEl.setAttribute('transform', 'translate(' + nicData.left + ',' + nicData.top + ')');
+    nicEl.setAttribute('transform', 'translate(' + svgProperties.interfaceLeft + ',' + nicData.top + ')');
     nicEl.getElementsByTagName('text')[0].textContent = nicData.name;
     nicEl.getElementsByTagName('text')[0].setAttribute('x', (svgProperties.interfaceWidth / 2));
     nicEl.getElementsByTagName('text')[0].setAttribute('y', (nicData.height / 2));
@@ -315,13 +321,13 @@ function renderIPRanges(ipRangesData, interfacesData) {
       interfaceData = interfacesData[j]; // use this one
       break;
     }
-    var startX = 0;
+    var startX = svgProperties.ipLeft;
     var startY = ipRangeData.top;
     var path = 'M' + startX + ',' + startY + ' ';
         
     var controlY1 = ipRangeData.top;
     var controlY2 = interfaceData.top;
-    var endX = interfaceData.left;
+    var endX = svgProperties.interfaceLeft;
     var endY = interfaceData.top;
     path += getIPBezier(controlY1, controlY2, endX, endY);
     
@@ -329,20 +335,21 @@ function renderIPRanges(ipRangesData, interfacesData) {
     
     controlY1 = interfaceData.bottom;
     controlY2 = ipRangeData.bottom;
-    endX = 0;
+    endX = svgProperties.ipLeft;
     endY = ipRangeData.bottom;
     path += getIPBezier(controlY1, controlY2, endX, endY);
     
     path += 'Z';
     var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pathEl.setAttribute('d', path);
+    pathEl.setAttribute('fill', svgProperties.colors[i % svgProperties.colors.length]);
     
     var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.appendChild(pathEl);
     group.setAttribute('class', 'ipRange');
     
     var startIPtext = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    startIPtext.setAttribute('x', 2);
+    startIPtext.setAttribute('x', svgProperties.ipLeft + 2);
     startIPTextY = ipRangeData.top;
     if (ipRangeData.top < 12) {
         startIPTextY += 5;
@@ -352,13 +359,12 @@ function renderIPRanges(ipRangesData, interfacesData) {
         startIPTextClass = 'startIP';
     }
     startIPtext.setAttribute('y', startIPTextY);
-    startIPtext.setAttribute('filter', 'url(#solid)');
     startIPtext.textContent = ipRangeData.startIP;
     startIPtext.setAttribute('class', startIPTextClass);
     group.appendChild(startIPtext);
     
     var endIPtext = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    endIPtext.setAttribute('x', 2);
+    endIPtext.setAttribute('x', svgProperties.ipLeft + 2);
     endIPTextY = ipRangeData.bottom;
     if ((svgProperties.overallHeight - ipRangeData.bottom) < 12) {
       endIPTextY -= 5;
@@ -368,7 +374,6 @@ function renderIPRanges(ipRangesData, interfacesData) {
         endIPTextClass = 'endIP';
     }    
     endIPtext.setAttribute('y', endIPTextY);
-    endIPtext.setAttribute('filter', 'url(#solid)');
     endIPtext.textContent = ipRangeData.endIP;
     endIPtext.setAttribute('class', endIPTextClass);
     group.appendChild(endIPtext);
@@ -382,11 +387,23 @@ function renderIPRanges(ipRangesData, interfacesData) {
   }
 }
 
+function pickPath(destinationIP, routingTableData) {
+    var applicableRouteLine = null;
+    for (var i = 0; i < routingTableData.length; i++) {
+    if ()
+  }
+}
+
+function renderDestinationIPFlow(ip) {
+    var startTop = svgProperties.overallHeight * ip / 0xffffffff;
+  var interfaceTop = 
+}
+
 function getIPBezier(controlY1, controlY2, endX, endY) {
     // svg beziers look like this:
   // M start-x,start-y C control-x1 control-y1, control-x2 control-y2, end-x end-y
   // the start position must be set-up outside this function
-  var controlX1 = 100;
-  var controlX2 = 100;
+  var controlX1 = svgProperties.ipLeft + 100;
+  var controlX2 = svgProperties.interfaceLeft - 100;
   return 'C ' + controlX1 + ' ' + controlY1 + ',' + controlX2 + ' ' + controlY2 + ',' + endX + ' ' + endY + ' ';
 }
