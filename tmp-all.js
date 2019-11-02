@@ -1,29 +1,25 @@
+// static properties
 var svgProperties = {
     overallHeight: 400, // gets updated to match the svg
-  overallWidth: 400, // gets updated to match the svg
-  ipLeft: 100, // the left position of the ip ranges
-  verticalGapBetweenInterfaces: 10,
-  verticalGapBeforeAndAfterInterfaces: 30, // the gap before interfaces, repeated at the bottom too
-  interfaceLeft: 250, // the left position of the interfaces
-  interfaceRight: 300, // the left position of the interfaces
-  borderTop: 1,
-  borderLeft: 1,
-  colors: [
-    'blue','green', 'red', 'yellow'
-  ]
+    overallWidth: 400, // gets updated to match the svg
+    borders: 1,
+
+    ipLeft: 100, // the left position of the ip ranges
+    ipColors: [
+        'blue','green', 'red', 'yellow'
+    ],
+
+    interfaceLeft: 250, // the left position of the interfaces
+    interfaceRight: 300, // the right position of the interfaces
+    verticalGapBetweenInterfaces: 10,
+    verticalGapBeforeAndAfterInterfaces: 30, // the gap before interfaces, repeated at the bottom too
+
+    gatewayLeft: 450,
+    gatewayRight: 600
 };
 
-function getMissingData(dataIn) {
-    try {
-    return getMissingDataGrunt(dataIn);
-  } catch (e) {
-    error(e);
-    return null;
-  }
-}
-
 // take basic data from 1 line of the route table and fill in missing data
-function getMissingDataGrunt(dataIn) {
+function getMissingData(dataIn) {
     var dataOut = {
     destination: dataIn.destination,
     destinationList: ip2List(dataIn.destination),
@@ -149,11 +145,16 @@ function binInvert(int, ipVersion) {
 document.getElementById('parseRoutingTable').onclick = function() {
     var routingTableStr = document.getElementsByTagName('textarea')[0].value;
     var routingTableData = parseRoutingTable(routingTableStr);
-  for (var i = 0; i < routingTableData.routes.length; i++) {
-    routingTableData.routes[i] = getMissingData(routingTableData.routes[i]);
-  }
-  console.log(routingTableData);
-  render(routingTableData);
+    try {
+        for (var i = 0; i < routingTableData.routes.length; i++) {
+            routingTableData.routes[i] = getMissingData(routingTableData.routes[i]);
+        }
+    } catch (e) {
+        error(e);
+        return null;
+    }
+    console.log(routingTableData);
+    render(routingTableData);
 };
 
 var routeTableFormat = {
@@ -229,17 +230,24 @@ function error(txt) {
 
 function render(routingTableData) {
     updateSVGProperties();
-  // get the interface coordinates
-  var interfaceData = getInterfaceCoordinates(routingTableData);
-  // render the interfaces
-  renderInterfaces(interfaceData);
-  
-  // then get the ip range coordinates
-  var ipRangesData = getIPRangeCoordinates(routingTableData);
-  // render the ip ranges going to the interfaces
-  renderIPRanges(ipRangesData, interfaceData);
-  
-  renderDestinationIPFlow(document.getElementById('destinationIP').value);
+    // get the interface coordinates
+    var interfaceData = getInterfaceCoordinates(routingTableData);
+    // render the interfaces
+    renderInterfaces(interfaceData);
+
+    // then get the ip range coordinates
+    var ipRangesData = getIPRangeCoordinates(routingTableData);
+    // render the ip ranges going to the interfaces
+    renderIPRanges(ipRangesData, interfaceData);
+
+    // get the applicable route table line
+    var destinationIP = document.getElementById('destinationIP').value;
+    var destinationIPList = ip2List(destinationIP);
+    var routingTableDataLine = pickPath(destinationIPList, routingTableData);
+    if (routingTableDataLine == null) return;
+
+    // render the desination ip flow
+    renderDestinationIPFlow(destinationIPList, routingTableDataLine, interfaceData);
 }
 
 function updateSVGProperties() {
@@ -324,25 +332,20 @@ function renderIPRanges(ipRangesData, interfacesData) {
     var startX = svgProperties.ipLeft;
     var startY = ipRangeData.top;
     var path = 'M' + startX + ',' + startY + ' ';
-        
-    var controlY1 = ipRangeData.top;
-    var controlY2 = interfaceData.top;
+
     var endX = svgProperties.interfaceLeft;
     var endY = interfaceData.top;
-    path += getIPBezier(controlY1, controlY2, endX, endY);
-    
-    path += 'V' + interfaceData.bottom + ' ';
-    
-    controlY1 = interfaceData.bottom;
-    controlY2 = ipRangeData.bottom;
+    path += getIPBezier(startY, endX, endY);
+
+    startY = interfaceData.bottom;
+    path += 'V' + startY + ' ';
+
     endX = svgProperties.ipLeft;
     endY = ipRangeData.bottom;
-    path += getIPBezier(controlY1, controlY2, endX, endY);
-    
-    path += 'Z';
+    path += getIPBezier(startY, endX, endY) + 'Z';
     var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pathEl.setAttribute('d', path);
-    pathEl.setAttribute('fill', svgProperties.colors[i % svgProperties.colors.length]);
+    pathEl.setAttribute('fill', svgProperties.ipColors[i % svgProperties.ipColors.length]);
     
     var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.appendChild(pathEl);
@@ -387,23 +390,73 @@ function renderIPRanges(ipRangesData, interfacesData) {
   }
 }
 
-function pickPath(destinationIP, routingTableData) {
-    var applicableRouteLine = null;
-    for (var i = 0; i < routingTableData.length; i++) {
-    if ()
-  }
+// given a destination ip (list), choose the line from the routing table that
+// applies to it. if there is more than one line then set an error and return
+// null
+function pickPath(destinationIPList, routingTableData) {
+    var applicableRouteLines = []; // init
+    var largestNetmaskBits = 0; // largest = 32 = the most specific
+    for (var i = 0; i < routingTableData.routes.length; i++) {
+        var routingTableDataLine = routingTableData.routes[i];
+        var inRange = true; // start optimistic
+        for (var j = 0; j < destinationIPList.length; j++) {
+            if (
+                (destinationIPList[j] < routingTableDataLine.hostStartList[j])
+                || (destinationIPList[j] > routingTableDataLine.hostEndList[j])
+            ) {
+                inRange = false;
+                break;
+            }
+        }
+        if (!inRange) continue;
+        var netmaskBits = mask2Bits(routingTableDataLine.mask);
+        if (netmaskBits < largestNetmaskBits) continue;
+        applicableRouteLines.push(i);
+    }
+    if (applicableRouteLines.length == 0) {
+        error('no route rules apply to this destination ip');
+        return null;
+    }
+    if (applicableRouteLines.length > 1) {
+        error('more than 1 route rule applies to this destination ip');
+        return null;
+    }
+    return routingTableData.routes[applicableRouteLines[0]];
 }
 
-function renderDestinationIPFlow(ip) {
-    var startTop = svgProperties.overallHeight * ip / 0xffffffff;
-  var interfaceTop = 
+function renderDestinationIPFlow(destinationIPList, routeTableLine, interfaceData) {
+    var destinationIPInt = ipList2Int(destinationIPList);
+
+    var startX = svgProperties.ipLeft;
+    var startY = svgProperties.overallHeight * destinationIPInt / 0xffffffff;
+    var path = 'M' + startX + ',' + startY + ' ';
+
+    var relevantInterface = null;
+    for (var i = 0; i < interfaceData.length; i++) {
+        if (interfaceData[i].name != routeTableLine.interface) continue;
+        relevantInterface = interfaceData[i];
+        break;
+    }
+    var endY = relevantInterface.midway;
+    var endX = svgProperties.interfaceLeft;
+    path += getIPBezier(startY, endX, endY)
+
+    var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pathEl.setAttribute('d', path);
+    pathEl.setAttribute('fill', 'none');
+    pathEl.setAttribute('stroke', 'black');
+    var svg = document.getElementById('routeTable');
+    svg.appendChild(pathEl);
 }
 
-function getIPBezier(controlY1, controlY2, endX, endY) {
+function getIPBezier(startY, endX, endY) {
     // svg beziers look like this:
   // M start-x,start-y C control-x1 control-y1, control-x2 control-y2, end-x end-y
   // the start position must be set-up outside this function
   var controlX1 = svgProperties.ipLeft + 100;
+  var controlY1 = startY;
+  var controlY2 = endY;
   var controlX2 = svgProperties.interfaceLeft - 100;
-  return 'C ' + controlX1 + ' ' + controlY1 + ',' + controlX2 + ' ' + controlY2 + ',' + endX + ' ' + endY + ' ';
+  return 'C ' + controlX1 + ' ' + controlY1 + ',' + controlX2 + ' ' +
+  controlY2 + ',' + endX + ' ' + endY + ' ';
 }
