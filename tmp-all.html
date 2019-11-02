@@ -26,8 +26,7 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
     .nic rect {
       stroke: red;
       stroke-width: 0;
-      fill: #444444;
-      /*paint-order: stroke;*/
+      fill: #555555;
     }
     text {
       fill: white;
@@ -36,26 +35,39 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
       text-anchor: middle;/*horizontal*/
       dominant-baseline: middle;/*grab the text by the vertical center*/
     }
-    .ipRange {
-      opacity:0.5;
+    #z1 .ipRange {
+      opacity: 0.5;
     }
-    .ipRange:hover {
-      opacity: 0.8;
+    #z2 .ipRange {
+      opacity: 0;
     }
-    .ipRange text {
+    #z2 .ipRange text {
       font-size: 12px;
-    }
-    .ipRange text.startIP, .ipRange text.endIP-near-bottom {
-      dominant-baseline: baseline;
-    }
-    .ipRange text.endIP, .ipRange text.startIP-near-top {
-      dominant-baseline: hanging;
-    }
-    .ipRange text, filter {
       visibility: hidden;
     }
-    .ipRange:hover text {
+    #z2 .ipRange:hover {
+      opacity: 0.9;
+    }
+    #z2 .ipRange:hover text {
       visibility: visible;
+      opacity: 1;
+    }
+    text.destinationIP {
+      dominant-baseline: middle;
+    }
+    .ipRange text.startIP,
+    .ipRange text.startIP-near-bottom,
+    text.destinationIP-near-bottom {
+      dominant-baseline: baseline;
+    }
+    .ipRange text.endIP,
+    .ipRange text.endIP-near-top,
+    text.destinationIP-near-top {
+      dominant-baseline: hanging;
+    }
+    .destinationIPFlow {
+      stroke: white;
+      fill: none;
     }
 ]]></style>
   <defs>
@@ -65,4 +77,7 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
     </g>
   </defs>
   <rect width="100%" height="100%" fill="black"/>
+  <g id="z1"/>
+  <g id="z2"/>
+  <g id="z3"/>
 </svg>
