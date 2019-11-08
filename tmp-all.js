@@ -1,24 +1,40 @@
 // static properties
+var svg = document.getElementById('routeTable');
+var svgDefs = svg.getElementsByTagName('defs')[0];
 var svgProperties = {
     overallHeight: 400, // gets updated to match the svg
     overallWidth: 400, // gets updated to match the svg
     borders: 1,
 
-    ipLeft: 100, // the left position of the ip ranges
+    ipLeft: 110, // the left position of the ip ranges
     ipColors: [
         'blue'//,'green', 'red', 'purple'
     ],
 
-    interfaceLeft: 250, // the left position of the interfaces
-    interfaceRight: 300, // the right position of the interfaces
-    verticalGapBetweenInterfaces: 10,
+        interfaceSquareSide: 100, // interfaces are squares and this is the length of one side
+    interfaceLeft: 260, // the left position of the interfaces
+    minVerticalGapBetweenInterfaces: 10,
     verticalGapBeforeAndAfterInterfaces: 30, // the gap before interfaces, repeated at the bottom too
 
-    gatewayLeft: 450,
-    gatewayRight: 600
+    gatewayLeft: 450, // the left position of the gateways
+    gatewayRadius: 50, // gateways are circles and this is the radius
+    minVerticalGapBetweenGateways: 10,
+    verticalGapBeforeAndAfterGateways: 30, // the gap before gateways, repeated at the bottom too
 };
 
-updateSVGProperties();
+// events
+function z2GroupPathClicked() {
+    var allPaths = svg.querySelectorAll('#z2 g.ipRange');
+  for (var i = 0; i < allPaths.length; i++) {
+    var path = allPaths[i];
+    path.classList.remove('clicked');
+  }
+  if (this.tagName.toLowerCase() == 'g') {
+        this.classList.add('clicked');
+  }
+}
+
+initSVGProperties();
 
 // take basic data from 1 line of the route table and fill in missing data
 function getMissingData(dataIn) {
@@ -31,7 +47,8 @@ function getMissingData(dataIn) {
     maskList: ip2List(dataIn.mask),
     maskIPVersion: getIPVersion(dataIn.mask),
 
-    interface: dataIn.interface
+    interface: dataIn.interface,
+    gateway: dataIn.gateway
   };
   validIP(dataOut.destinationList, dataOut.destinationIPVersion);
   validIP(dataOut.maskList, dataOut.maskIPVersion);
@@ -145,6 +162,7 @@ function binInvert(int, ipVersion) {
 }
 
 document.getElementById('parseRoutingTable').onclick = function() {
+        svg.style.display = 'inline';
         clearSVG();
     var routingTableStr = document.getElementsByTagName('textarea')[0].value;
     var routingTableData = parseRoutingTable(routingTableStr);
@@ -232,11 +250,14 @@ function error(txt) {
 // rendering
 
 function clearSVG() {
-    var svg = document.getElementById('routeTable');
     removeAllChildren(svg.getElementById('z1'));
   removeAllChildren(svg.getElementById('z2'));
   removeAllChildren(svg.getElementById('z3'));
-  var destinationIPEls = svg.getElementsByClassName('destinationIP');
+  clearDestinationIPs();
+}
+
+function clearDestinationIPs() {
+    var destinationIPEls = svg.getElementsByClassName('destinationIP');
   if (destinationIPEls.length > 0) {
     svg.removeChild(destinationIPEls[0]);
   }
@@ -249,15 +270,25 @@ function removeAllChildren(el) {
 }
 
 function render(routingTableData) {
+        // resize the svg height to fit the interfaces and gateways
+    resizeSVGHeight(routingTableData);
+
     // get the interface coordinates
     var interfaceData = getInterfaceCoordinates(routingTableData);
+
+    // get the gateway coordinates
+    var gatewayData = getGatewayCoordinates(routingTableData);
+
     // render the interfaces
     renderInterfaces(interfaceData);
+
+        // render the gateways
+    renderGateways(gatewayData);
 
     // then get the ip range coordinates
     var ipRangesData = getIPRangeCoordinates(routingTableData);
     // render the ip ranges going to the interfaces
-    renderIPRanges(ipRangesData, interfaceData);
+    renderIPRanges(ipRangesData, interfaceData, gatewayData);
 
     // get the applicable route table line
     var destinationIP = document.getElementById('destinationIP').value;
@@ -266,16 +297,37 @@ function render(routingTableData) {
     if (routingTableDataLine == null) return;
 
     // render the desination ip flow
-    renderDestinationIPFlow(destinationIP, destinationIPList, routingTableDataLine, interfaceData);
+    renderDestinationIPFlow(destinationIP, destinationIPList, routingTableDataLine, interfaceData, gatewayData);
 }
 
-function updateSVGProperties() {
-  var svg = document.getElementById('routeTable');
-  var svgDefs = svg.getElementsByTagName('defs')[0];
+function initSVGProperties() {
   var nicEl = svgDefs.querySelectorAll('.nic')[0];
   svgProperties.overallHeight = svg.getBBox().height;
   svgProperties.overallWidth = svg.getBBox().width;
-  svgProperties.interfaceWidth = nicEl.getBBox().width;
+}
+
+function resizeSVGHeight(routingTableData) {
+  var interfaceNames = []; // init
+  var gatewayNames = []; // init
+  for (var i = 0; i < routingTableData.routes.length; i++) {
+    var routeLine = routingTableData.routes[i];
+
+    var interfaceName = routeLine.interface;
+    if (interfaceNames.indexOf(interfaceName) == -1) interfaceNames.push(interfaceName);
+
+    var gatewayName = routeLine.gateway;
+    if (gatewayNames.indexOf(gatewayName) == -1) gatewayNames.push(gatewayName);
+  }
+
+  var minHeightForInterfaces = (2 * svgProperties.verticalGapBeforeAndAfterInterfaces) + (interfaceNames.length * svgProperties.interfaceSquareSide) + ((interfaceNames.length - 1) * svgProperties.minVerticalGapBetweenInterfaces);
+
+  var minHeightForGateways = (2 * svgProperties.verticalGapBeforeAndAfterGateways) + (gatewayNames.length * 2 * svgProperties.gatewayRadius) + ((gatewayNames.length - 1) * svgProperties.minVerticalGapBetweenGateways);
+
+  svgProperties.overallHeight = minHeightForInterfaces; // init
+  if (minHeightForGateways > svgProperties.overallHeight) svgProperties.overallHeight = minHeightForGateways;
+  svg.style.height = svgProperties.overallHeight;
+  svg.setAttribute('viewBox', '0 0 800 ' + svgProperties.overallHeight);
+  svg.getElementsByClassName('smallestIP')[0].setAttribute('y', svgProperties.overallHeight - 5);
 }
 
 function getInterfaceCoordinates(routingTableData) {
@@ -288,32 +340,68 @@ function getInterfaceCoordinates(routingTableData) {
   if (interfaceNames.length == 0) return null;
   var interfaceData = []; // init
   var heightForInterfaces = svgProperties.overallHeight - (svgProperties.verticalGapBeforeAndAfterInterfaces * 2)
-  var heightPerInterface = (heightForInterfaces + (svgProperties.verticalGapBetweenInterfaces * (1 - interfaceNames.length))) / interfaceNames.length;
+  var verticalGapBetweenInterfaces = (heightForInterfaces - (interfaceNames.length * svgProperties.interfaceSquareSide)) / (interfaceNames.length - 1);
   for (var i = 0; i < interfaceNames.length; i++) {
-    var top = svgProperties.verticalGapBeforeAndAfterInterfaces + (i * (heightPerInterface + svgProperties.verticalGapBetweenInterfaces));
+    var top = svgProperties.verticalGapBeforeAndAfterInterfaces + (i * (svgProperties.interfaceSquareSide + verticalGapBetweenInterfaces));
         interfaceData.push({
         name: interfaceNames[i],
         top: top,
-      midway: top + (heightPerInterface / 2),
-      height: heightPerInterface,
-      bottom: top + heightPerInterface
+      midway: top + (svgProperties.interfaceSquareSide / 2),
+      height: svgProperties.interfaceSquareSide,
+      bottom: top + svgProperties.interfaceSquareSide
     });
   }
   return interfaceData;
 }
 
 function renderInterfaces(interfaceData) {
-  var svg = document.getElementById('routeTable');
-  var svgDefs = svg.getElementsByTagName('defs')[0];
   for (var i = 0; i < interfaceData.length; i++) {
     var nicData = interfaceData[i];
     var nicEl = svgDefs.querySelectorAll('.nic')[0].cloneNode(true);
     nicEl.getElementsByTagName('rect')[0].setAttribute('height', nicData.height);
+    nicEl.getElementsByTagName('rect')[0].setAttribute('width', svgProperties.interfaceSquareSide);
     nicEl.setAttribute('transform', 'translate(' + svgProperties.interfaceLeft + ',' + nicData.top + ')');
     nicEl.getElementsByTagName('text')[0].textContent = nicData.name;
-    nicEl.getElementsByTagName('text')[0].setAttribute('x', (svgProperties.interfaceWidth / 2));
+    nicEl.getElementsByTagName('text')[0].setAttribute('x', svgProperties.interfaceSquareSide / 2);
     nicEl.getElementsByTagName('text')[0].setAttribute('y', (nicData.height / 2));
     svg.getElementById('z1').appendChild(nicEl);
+  }
+}
+
+function getGatewayCoordinates(routingTableData) {
+    var gatewayNames = [];
+    for (var i = 0; i < routingTableData.routes.length; i++) {
+    var gatewayName = routingTableData.routes[i].gateway;
+    if (gatewayNames.indexOf(gatewayName) != -1) continue;
+    gatewayNames.push(gatewayName);
+  }
+  if (gatewayNames.length == 0) return null;
+  var gatewayData = []; // init
+  var heightForGateways = svgProperties.overallHeight - (svgProperties.verticalGapBeforeAndAfterGateways * 2);
+  var verticalGapBetweenGateways = (heightForGateways - (gatewayNames.length * svgProperties.gatewayRadius * 2)) / (gatewayNames.length - 1);
+  for (var i = 0; i < gatewayNames.length; i++) {
+    var top = svgProperties.verticalGapBeforeAndAfterGateways + (i * ((svgProperties.gatewayRadius * 2) + verticalGapBetweenGateways));
+        gatewayData.push({
+        name: gatewayNames[i],
+        top: top,
+      midway: top + svgProperties.gatewayRadius,
+      height: (svgProperties.gatewayRadius * 2),
+      bottom: top + (svgProperties.gatewayRadius * 2)
+    });
+  }
+  return gatewayData;
+}
+
+function renderGateways(gatewayData) {
+  for (var i = 0; i < gatewayData.length; i++) {
+    var gwData = gatewayData[i];
+    var gwEl = svgDefs.querySelectorAll('.gateway')[0].cloneNode(true);
+    gwEl.getElementsByTagName('circle')[0].setAttribute('r', svgProperties.gatewayRadius);
+    gwEl.setAttribute('transform', 'translate(' + (svgProperties.gatewayLeft + svgProperties.gatewayRadius) + ',' + (gwData.top + svgProperties.gatewayRadius) + ')');
+    gwEl.getElementsByTagName('text')[0].textContent = gwData.name;
+    gwEl.getElementsByTagName('text')[0].setAttribute('x', 0);
+    gwEl.getElementsByTagName('text')[0].setAttribute('y', 0);
+    svg.getElementById('z4').appendChild(gwEl);
   }
 }
 
@@ -328,7 +416,8 @@ function getIPRangeCoordinates(routingTableData) {
         endIP: routeTableLine.hostEndList.join('.'),
         top: end,
         bottom: start,
-        interfaceName: routeTableLine.interface
+        interfaceName: routeTableLine.interface,
+        gatewayName: routeTableLine.gateway
     });
   }
   return interfaceData;
@@ -338,8 +427,7 @@ function ipInt2Y(ipInt) {
     return svgProperties.overallHeight * (1 - (ipInt / 0xffffffff));
 }
 
-function renderIPRanges(ipRangesData, interfacesData) {
-    var svg = document.getElementById('routeTable');
+function renderIPRanges(ipRangesData, interfacesData, gatewaysData) {
   var startIPTextClass = ''; // init
   var startIPTextY = 0; //init
   var endIPTextClass = ''; // init
@@ -348,33 +436,70 @@ function renderIPRanges(ipRangesData, interfacesData) {
     var ipRangeData = ipRangesData[i];
     var interfaceData = null;
     for (var j = 0; j < interfacesData.length; j++) {
-        if (ipRangeData.interfaceName != interfacesData[j].name) continue;
+      if (ipRangeData.interfaceName != interfacesData[j].name) continue;
       interfaceData = interfacesData[j]; // use this one
       break;
     }
+
+    var gatewayData = null;
+    for (var j = 0; j < gatewaysData.length; j++) {
+      if (ipRangeData.gatewayName != gatewaysData[j].name) continue;
+      gatewayData = gatewaysData[j]; // use this one
+      break;
+    }
+
+    var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'ipRange');
+
+    // the path from the ip range to the interface
     var startX = svgProperties.ipLeft;
     var startY = ipRangeData.bottom;
     var path = 'M' + startX + ',' + startY + ' ';
 
     var endX = svgProperties.interfaceLeft;
     var endY = interfaceData.bottom;
-    path += getIPBezier(startY, endX, endY);
+    path += getIPBezier(startX, startY, endX, endY);
 
+        startX = endX;
     startY = interfaceData.top;
     path += 'V' + startY + ' ';
 
     endX = svgProperties.ipLeft;
     endY = ipRangeData.top;
-    path += getIPBezier(startY, endX, endY) + 'Z';
+    path += getIPBezier(startX, startY, endX, endY) + 'Z';
     var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pathEl.setAttribute('d', path);
     pathEl.setAttribute('fill', svgProperties.ipColors[i % svgProperties.ipColors.length]);
     pathEl.setAttribute('class', 'ipRange');
-    svg.getElementById('z1').appendChild(pathEl.cloneNode(true));
-
-    var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.appendChild(pathEl);
-    group.setAttribute('class', 'ipRange');
+        svg.getElementById('z1').appendChild(pathEl.cloneNode(true));
+
+        // the path from the interface to the gateway
+        startX = svgProperties.interfaceLeft + svgProperties.interfaceSquareSide;
+    startY = interfaceData.top;
+    var path = 'M' + startX + ',' + startY + ' '; // new path
+
+    var endX = svgProperties.gatewayLeft + svgProperties.gatewayRadius;
+    var endY = gatewayData.top;
+    path += getIPBezier(startX, startY, endX, endY);
+
+    endY = gatewayData.bottom;
+    var arcRotation = 180; // +/- doesn't matter
+    var largeArcFlag = 0; // can be anything
+    var sweepFlag = 0; // 0 = keep left
+    path += 'A ' + svgProperties.gatewayRadius + ',' + svgProperties.gatewayRadius + ' ' + arcRotation + ' ' + largeArcFlag + ' ' + sweepFlag + ' ' + endX + ',' + endY;
+
+    startX = endX;
+    startY = endY;
+    endX = svgProperties.interfaceLeft + svgProperties.interfaceSquareSide;
+    endY = interfaceData.bottom;
+    path += getIPBezier(startX, startY, endX, endY) + 'Z';
+    var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pathEl.setAttribute('d', path);
+    pathEl.setAttribute('fill', svgProperties.ipColors[i % svgProperties.ipColors.length]);
+    pathEl.setAttribute('class', 'ipRange');
+    group.appendChild(pathEl);
+        svg.getElementById('z1').appendChild(pathEl.cloneNode(true));
 
     var startIPtext = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     startIPtext.setAttribute('x', svgProperties.ipLeft + 2);
@@ -407,6 +532,7 @@ function renderIPRanges(ipRangesData, interfacesData) {
     group.appendChild(endIPtext);
 
     svg.getElementById('z2').appendChild(group);
+    group.onclick = z2GroupPathClicked;
   }
 }
 
@@ -457,7 +583,7 @@ function pickPath(destinationIPList, routingTableData) {
     return routingTableData.routes[keep[0]];
 }
 
-function renderDestinationIPFlow(destinationIP, destinationIPList, routeTableLine, interfaceData) {
+function renderDestinationIPFlow(destinationIP, destinationIPList, routeTableLine, interfaceData, gatewayData) {
     var destinationIPInt = ipList2Int(destinationIPList);
 
     var startX = svgProperties.ipLeft;
@@ -472,30 +598,59 @@ function renderDestinationIPFlow(destinationIP, destinationIPList, routeTableLin
     }
     var endY = relevantInterface.midway;
     var endX = svgProperties.interfaceLeft;
-    path += getIPBezier(startY, endX, endY)
+    path += getIPBezier(startX, startY, endX, endY);
 
     var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pathEl.setAttribute('d', path);
     pathEl.setAttribute('class', 'destinationIPFlow');
-    var svg = document.getElementById('routeTable');
     svg.getElementById('z3').appendChild(pathEl);
 
     var destinationIPtext = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    destinationIPtext.setAttribute('x', 2);
+    destinationIPtext.setAttribute('x', svgProperties.ipLeft - 2);
+    if (startY < 23) startY = 23;
+    else if (startY > (svgProperties.overallHeight - 23)) startY = svgProperties.overallHeight - 23;
     destinationIPtext.setAttribute('y', startY);
     destinationIPtext.textContent = destinationIP;
     destinationIPtext.setAttribute('class', 'destinationIP');
     svg.appendChild(destinationIPtext);
+
+    startX = svgProperties.interfaceLeft + svgProperties.interfaceSquareSide;
+    startY = endY;
+    path = 'M' + startX + ',' + startY + ' ';
+
+    var relevantGateway = null;
+    for (var i = 0; i < gatewayData.length; i++) {
+        if (gatewayData[i].name != routeTableLine.gateway) continue;
+        relevantGateway = gatewayData[i];
+        break;
+    }
+    endY = relevantGateway.midway;
+    endX = svgProperties.gatewayLeft + svgProperties.gatewayRadius;
+    var angledEnd = true;
+    path += getIPBezier(startX, startY, endX, endY, angledEnd);
+
+    pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pathEl.setAttribute('d', path);
+    pathEl.setAttribute('class', 'destinationIPFlow');
+    svg.getElementById('z3').appendChild(pathEl);
 }
 
-function getIPBezier(startY, endX, endY) {
-    // svg beziers look like this:
+function getIPBezier(startX, startY, endX, endY, angledEnd) {
+  // svg beziers look like this:
   // M start-x,start-y C control-x1 control-y1, control-x2 control-y2, end-x end-y
   // the start position must be set-up outside this function
-  var controlX1 = svgProperties.ipLeft + 100;
+  if (angledEnd == null) angledEnd = false;
+  var controlSize = (endX - startX) / 2;
+  var controlX1 = startX + controlSize;
   var controlY1 = startY;
-  var controlY2 = endY;
-  var controlX2 = svgProperties.interfaceLeft - 100;
+  var controlX2, controlY2; // init
+  if (angledEnd) {
+    controlX2 = startX;
+    controlY2 = startY;
+  } else {
+    controlX2 = endX - controlSize;
+    controlY2 = endY;
+  }
   return 'C ' + controlX1 + ' ' + controlY1 + ',' + controlX2 + ' ' +
   controlY2 + ',' + endX + ' ' + endY + ' ';
 }

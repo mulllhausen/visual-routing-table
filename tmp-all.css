@@ -2,3 +2,6 @@
   color: red;
   display: block;
 }
+svg {
+  display: none;
+}
