@@ -1,4 +1,8 @@
-<textarea rows="6" cols="80">Kernel IP routing table
+<button id="loadWindows">windows</button>
+<button id="loadLinux1">linux 1</button>
+<button id="loadLinux2">linux 2</button>
+<button id="loadMacOS">macos</button><br>
+<textarea id="inputRouteTable" rows="6" cols="80">Kernel IP routing table
 Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 0.0.0.0         192.168.1.1     0.0.0.0         UG    0      0        0 eth0
 172.16.0.0      192.168.0.1     255.255.0.0     UG    0      0        0 eth1
@@ -24,14 +28,18 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
         font-size: 12px;
         /*pointer-events: all;*/
     }
+    .namedArea {
+      stroke: #555555;
+      /*stroke-dasharray: 4;*/
+    }
+    .areaName {
+      dominant-baseline: hanging;
+      text-anchor: middle;/*horizontal*/
+    }
     .nic rect {
-      stroke: red;
-      stroke-width: 0;
       fill: #555555;
     }
     .gateway circle {
-      stroke: red;
-      stroke-width: 0;
       fill: #555555;
     }
     text {
@@ -42,7 +50,7 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
       dominant-baseline: middle;/*grab the text by the vertical center*/
     }
     .nic .inner, #gatewayHalfArrow .inner {
-      fill: #222222;
+      fill: #494949;
     }
     #z1 .ipRange {
       opacity: 0.3;
@@ -60,8 +68,8 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
       visibility: visible;
       opacity: 1;
     }
-    text.largestIP,
-    text.smallestIP {
+    text#largestIP,
+    text#smallestIP {
       text-anchor: end;
       fill: blue;
     }
@@ -69,15 +77,15 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
       text-anchor: end;
       dominant-baseline: middle;
     }
-    text.smallestIP,
+    text#smallestIP,
     .ipRange text.startIP,
-    .ipRange text.startIP-near-bottom,
+    .ipRange text.endIP-near-startIP,
     text.destinationIP-near-bottom {
       dominant-baseline: baseline;
     }
-    text.largestIP,
+    text#largestIP,
     .ipRange text.endIP,
-    .ipRange text.endIP-near-top,
+    .ipRange text.startIP-near-endIP,
     text.destinationIP-near-top {
       dominant-baseline: hanging;
     }
@@ -90,7 +98,7 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
     <g class="nic">
       <rect x="0" y="0" width="100" height="100" />
       <path d="M10,20 H20 V10 H80 V20 H90 V90 H10 Z" class="inner"/>
-      <text x="50" y="10">nicname</text>
+      <text transform="translate(50,50)"/>
     </g>
     <symbol id="gatewayHalfArrow">
       <path d="M0,45 10,35 H7 V10 H0 Z" class="inner"/>
@@ -108,12 +116,18 @@ destination ip: <input type="text" id="destinationIP" value="192.168.2.1">
 
       <use xlink:href="#gatewayHalfArrow" transform="translate(-50,0) rotate(-90)"/>
       <use xlink:href="#gatewayHalfArrow" transform="translate(-50,0) rotate(-90) scale(-1,1)"/>
-      <text x="0" y="0">gatewayname</text>
+      <text x="0" y="0"></text>
+    </g>
+    <g class="cloud">
+      <circle cx="14" cy="34" r="14" fill="red"/>
+      <circle cx="30" cy="25" r="13" fill="red"/>
+      <circle cx="44" cy="26" r="10" fill="red"/>
+      <circle cx="51" cy="38" r="10" fill="red"/>
+      <rect x="14" y="34" width="37" height="14" fill="red"/>
     </g>
   </defs>
   <rect width="100%" height="100%" fill="black"/>
-  <text x="108" y="395" class="smallestIP">0.0.0.1</text>
-  <text x="108" y="5" class="largestIP">255.255.255.254</text>
+  <g id="z0"/>
   <g id="z1"/>
   <g id="z2"/>
   <g id="z3"/>

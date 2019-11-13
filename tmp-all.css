@@ -1,7 +1,10 @@
+body {
+  background-color: black;
+}
 #error {
   color: red;
   display: block;
 }
 svg {
-  display: none;
+  border: none;
 }
